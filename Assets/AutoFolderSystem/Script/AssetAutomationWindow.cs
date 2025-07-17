@@ -29,11 +29,11 @@ namespace SJW
         private string pendingRenameOldPath;
         private string pendingRenameNewPath;
 
-        [MenuItem("Tools/Asset Automation Tool")]
+        [MenuItem("Tools/Auto Folder&File System")]
         public static void ShowWindow()
         {
-            var window = GetWindow<AssetAutomationWindow>("Asset Automation");
-            window.minSize = new Vector2(660, 960);
+            var window = GetWindow<AssetAutomationWindow>("Auto Folder&File System");
+            window.minSize = new Vector2(660, 950);
             window.maxSize = new Vector2(800, 2000);
             window.Show();
         }
@@ -127,7 +127,7 @@ namespace SJW
             EditorGUILayout.Space();
 
             GUI.enabled = settings.TargetFolders.Count > 0;
-            if (GUILayout.Button($"선택된 폴더로 {settings.SelectedExtension} 애셋 일괄 이동.", GUILayout.Height(50)))
+            if (GUILayout.Button($"선택된 폴더의 {settings.SelectedExtension} 애셋 일괄 처리 시작", GUILayout.Height(50)))
                 assetProcessor.ProcessAssetsInSelectedFolders(settings.TargetFolders, settings.SelectedExtension);
             GUI.enabled = true;
         }
@@ -419,7 +419,7 @@ namespace SJW
                 EditorGUILayout.HelpBox("추가된 사용자 정의 확장자가 없습니다.", MessageType.Warning);
             else
             {
-                foreach (string ext in settings.CustomExtensions)
+                foreach (string ext in settings.CustomExtensions.ToList()) // Use ToList() to avoid modifying collection during iteration
                 {
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(ext);
@@ -460,7 +460,7 @@ namespace SJW
                 EditorGUILayout.HelpBox("제외된 폴더가 없습니다.", MessageType.Info);
             else
             {
-                foreach (string folderPath in settings.ExcludedFolders.ToList()) // Use ToList() to avoid modifying collection during iteration
+                foreach (string folderPath in settings.ExcludedFolders.ToList())
                 {
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(folderPath, EditorStyles.miniLabel);
