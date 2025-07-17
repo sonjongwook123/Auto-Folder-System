@@ -6,30 +6,48 @@ using System.Linq;
 
 public class AssetAutomationSettings : ScriptableObject
 {
-    private static AssetAutomationSettings _instance;
+    private static AssetAutomationSettings instance;
     public static AssetAutomationSettings Instance
     {
         get
         {
-            if (_instance == null)
+            if (instance == null)
             {
-                _instance = LoadOrCreateSettings();
+                instance = AssetDatabase.LoadAssetAtPath<AssetAutomationSettings>(SETTINGS_PATH);
+                if (instance == null)
+                {
+                    string directoryPath = Path.GetDirectoryName(SETTINGS_PATH).Replace('\\', '/');
+                    if (!AssetDatabase.IsValidFolder(directoryPath))
+                    {
+                        string currentPath = "Assets";
+                        string[] folders = directoryPath.Split('/');
+                        for (int i = 1; i < folders.Length; i++)
+                        {
+                            string nextPath = Path.Combine(currentPath, folders[i]).Replace('\\', '/');
+                            if (!AssetDatabase.IsValidFolder(nextPath))
+                                AssetDatabase.CreateFolder(currentPath, folders[i]);
+                            currentPath = nextPath;
+                        }
+                    }
+                    instance = CreateInstance<AssetAutomationSettings>();
+                    AssetDatabase.CreateAsset(instance, SETTINGS_PATH);
+                    AssetDatabase.SaveAssets();
+                }
             }
-            return _instance;
+            return instance;
         }
     }
 
     public string SelectedExtension = ".png";
     public List<string> TargetFolders = new List<string>();
     public List<string> CustomExtensions = new List<string>();
-
+    public List<string> ExcludedFolders = new List<string> { "Assets/AutoFolderSystem", "Assets/Editor" };
     public string SourceMoveFolder = "Assets/";
-    public string DestinationMoveFolder = "Assets/MovedAssets/";
+    public string DestinationMoveFolder = "Assets/";
     public string FileNameContainsForMove = "";
     public string FileNameExcludesForMove = "";
-    public bool CreateSubfolder = true;
+    public bool CreateSubfolder = false;
     public string SubfolderNamePrefix = "";
-
     public string DeleteTargetFolder = "Assets/";
     public string FileNameContainsForDelete = "";
     public string FileNameExcludesForDelete = "";
@@ -37,38 +55,10 @@ public class AssetAutomationSettings : ScriptableObject
 
     private const string SETTINGS_PATH = "Assets/Editor/AssetAutomation/AssetAutomationSettings.asset";
 
-    private static AssetAutomationSettings LoadOrCreateSettings()
-    {
-        AssetAutomationSettings settings = AssetDatabase.LoadAssetAtPath<AssetAutomationSettings>(SETTINGS_PATH);
-        if (settings == null)
-        {
-            settings = ScriptableObject.CreateInstance<AssetAutomationSettings>();
-            if (!AssetDatabase.IsValidFolder("Assets/Editor/AssetAutomation"))
-            {
-                AssetDatabase.CreateFolder("Assets/Editor", "AssetAutomation");
-            }
-            AssetDatabase.CreateAsset(settings, SETTINGS_PATH);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            Debug.Log("[AssetAutomation] 새로운 설정 파일 생성: " + SETTINGS_PATH);
-        }
-        return settings;
-    }
-
     public void SaveSettings()
     {
         EditorUtility.SetDirty(this);
         AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        Debug.Log("[AssetAutomation] 설정이 저장되었습니다.");
-    }
-
-    public void LoadSettings()
-    {
-        // Settings are automatically loaded when the ScriptableObject is accessed.
-        // We ensure data integrity on load/access if needed.
-        TargetFolders = TargetFolders.Where(AssetDatabase.IsValidFolder).ToList();
-        CustomExtensions = CustomExtensions.Select(ext => ext.ToLower()).Distinct().ToList();
     }
 
     public void AddCustomExtension(string extension)
@@ -80,9 +70,7 @@ public class AssetAutomationSettings : ScriptableObject
         }
 
         if (!extension.StartsWith("."))
-        {
             extension = "." + extension;
-        }
 
         extension = extension.ToLower();
         if (CustomExtensions.Contains(extension) || new[] { ".png", ".jpg", ".fbx", ".wav", ".mp3", ".ogg" }.Contains(extension))
@@ -93,22 +81,47 @@ public class AssetAutomationSettings : ScriptableObject
 
         CustomExtensions.Add(extension);
         SaveSettings();
-        Debug.Log($"[AssetAutomation] 사용자 정의 확장자 추가됨: {extension}");
     }
 
     public void RemoveCustomExtension(string extension)
     {
-        if (CustomExtensions.Contains(extension))
+        if (CustomExtensions.Remove(extension) && SelectedExtension == extension)
+            SelectedExtension = ".png";
+        SaveSettings();
+    }
+
+    public void AddExcludedFolder(string path)
+    {
+        if (string.IsNullOrEmpty(path))
         {
-            CustomExtensions.Remove(extension);
-            
-            if (SelectedExtension == extension)
-            {
-                SelectedExtension = ".png";
-            }
-            SaveSettings();
-            Debug.Log($"[AssetAutomation] 사용자 정의 확장자 제거됨: {extension}");
+            EditorUtility.DisplayDialog("경로 오류", "폴더 경로를 입력해주세요.", "확인");
+            return;
         }
+
+        if (!path.StartsWith("Assets/"))
+            path = Path.Combine("Assets", path.TrimStart('/')).Replace('\\', '/');
+        path = path.TrimEnd('/');
+
+        if (ExcludedFolders.Contains(path))
+        {
+            EditorUtility.DisplayDialog("경로 오류", $"폴더 '{path}'는 이미 제외 목록에 있습니다.", "확인");
+            return;
+        }
+
+        if (!AssetDatabase.IsValidFolder(path))
+        {
+            EditorUtility.DisplayDialog("경로 오류", $"폴더 '{path}'는 유효한 Assets 내 폴더가 아닙니다.", "확인");
+            return;
+        }
+
+        ExcludedFolders.Add(path);
+        SaveSettings();
+    }
+
+    public void RemoveExcludedFolder(string path)
+    {
+        if (ExcludedFolders.Remove(path))
+            SaveSettings();
     }
 
     public void ClearAllSettings()
@@ -116,20 +129,19 @@ public class AssetAutomationSettings : ScriptableObject
         SelectedExtension = ".png";
         TargetFolders.Clear();
         CustomExtensions.Clear();
-
+        ExcludedFolders.Clear();
+        ExcludedFolders.Add("Assets/AutoFolderSystem");
+        ExcludedFolders.Add("Assets/Editor");
         SourceMoveFolder = "Assets/";
         DestinationMoveFolder = "Assets/MovedAssets/";
         FileNameContainsForMove = "";
         FileNameExcludesForMove = "";
         CreateSubfolder = true;
         SubfolderNamePrefix = "";
-
         DeleteTargetFolder = "Assets/";
         FileNameContainsForDelete = "";
         FileNameExcludesForDelete = "";
         IncludeSubfoldersForDelete = true;
-
         SaveSettings();
-        Debug.Log("[AssetAutomation] 모든 설정이 초기화되었습니다.");
     }
 }

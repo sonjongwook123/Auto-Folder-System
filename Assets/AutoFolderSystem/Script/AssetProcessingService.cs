@@ -25,9 +25,7 @@ public class AssetProcessingService
             {
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (!AssetDatabase.IsValidFolder(assetPath) && Path.GetExtension(assetPath).ToLower() == selectedExtension.ToLower())
-                {
                     assetsToProcess.Add(assetPath);
-                }
             }
         }
 
@@ -64,114 +62,92 @@ public class AssetProcessingService
             }
 
             if (changed)
-            {
                 processedCount++;
-            }
         }
 
         EditorUtility.ClearProgressBar();
         AssetDatabase.Refresh();
         EditorUtility.DisplayDialog("처리 완료", $"{processedCount}개의 {selectedExtension} 애셋을 성공적으로 처리했습니다.", "확인");
-        Debug.Log($"[AssetAutomation] 총 {processedCount}개의 {selectedExtension} 애셋을 처리했습니다.");
     }
 
     private bool ProcessTexture(string assetPath)
     {
         TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-        if (importer != null)
-        {
-            bool wasChanged = false;
-            
-            if (importer.textureType != TextureImporterType.Sprite ||
-                importer.spriteImportMode != SpriteImportMode.Single ||
-                !importer.alphaIsTransparency ||
-                importer.mipmapEnabled)
-            {
-                importer.textureType = TextureImporterType.Sprite;
-                importer.spriteImportMode = SpriteImportMode.Single;
-                importer.alphaIsTransparency = true;
-                importer.mipmapEnabled = false;
-                wasChanged = true;
-            }
+        if (importer == null)
+            return false;
 
-            if (wasChanged)
-            {
-                importer.SaveAndReimport();
-                Debug.Log($"[TextureProcessor] {assetPath}를 스프라이트 텍스처로 설정했습니다.");
-            }
-            return wasChanged;
+        bool wasChanged = false;
+        if (importer.textureType != TextureImporterType.Sprite ||
+            importer.spriteImportMode != SpriteImportMode.Single ||
+            !importer.alphaIsTransparency ||
+            importer.mipmapEnabled)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.SaveAndReimport();
+            wasChanged = true;
         }
-        return false;
+        return wasChanged;
     }
 
     private bool ProcessModel(string assetPath)
     {
         ModelImporter importer = AssetImporter.GetAtPath(assetPath) as ModelImporter;
-        if (importer != null)
-        {
-            bool wasChanged = false;
-            // Disable animation import and apply medium mesh compression
-            if (importer.importAnimation)
-            {
-                importer.importAnimation = false;
-                wasChanged = true;
-            }
-            if (importer.meshCompression != ModelImporterMeshCompression.Medium)
-            {
-                importer.meshCompression = ModelImporterMeshCompression.Medium;
-                wasChanged = true;
-            }
+        if (importer == null)
+            return false;
 
-            if (wasChanged)
-            {
-                importer.SaveAndReimport();
-                Debug.Log($"[ModelProcessor] {assetPath} 모델 설정을 업데이트했습니다.");
-            }
-            return wasChanged;
+        bool wasChanged = false;
+        if (importer.importAnimation)
+        {
+            importer.importAnimation = false;
+            wasChanged = true;
         }
-        return false;
+        if (importer.meshCompression != ModelImporterMeshCompression.Medium)
+        {
+            importer.meshCompression = ModelImporterMeshCompression.Medium;
+            wasChanged = true;
+        }
+
+        if (wasChanged)
+            importer.SaveAndReimport();
+        return wasChanged;
     }
 
     private bool ProcessAudio(string assetPath)
     {
         AudioImporter importer = AssetImporter.GetAtPath(assetPath) as AudioImporter;
-        if (importer != null)
+        if (importer == null)
+            return false;
+
+        bool wasChanged = false;
+        AudioImporterSampleSettings currentSettings = importer.defaultSampleSettings;
+
+        if (currentSettings.loadType != AudioClipLoadType.Streaming)
         {
-            bool wasChanged = false;
-            AudioImporterSampleSettings currentSettings = importer.defaultSampleSettings;
-
-            if (currentSettings.loadType != AudioClipLoadType.Streaming)
-            {
-                currentSettings.loadType = AudioClipLoadType.Streaming;
-                importer.defaultSampleSettings = currentSettings; 
-                wasChanged = true;
-            }
-
-            if (importer.forceToMono != true)
-            {
-                importer.forceToMono = true;
-                wasChanged = true;
-            }
-
-            AudioCompressionFormat desiredCompressionFormat = AudioCompressionFormat.Vorbis;
-            float desiredQuality = 0.5f;
-
-            if (currentSettings.compressionFormat != desiredCompressionFormat || currentSettings.quality != desiredQuality)
-            {
-                currentSettings.compressionFormat = desiredCompressionFormat;
-                currentSettings.quality = desiredQuality;
-                importer.defaultSampleSettings = currentSettings; 
-                wasChanged = true;
-            }
-
-            if (wasChanged)
-            {
-                importer.SaveAndReimport();
-                Debug.Log($"[AudioProcessor] {assetPath} 오디오 설정을 업데이트했습니다.");
-            }
-            return wasChanged;
+            currentSettings.loadType = AudioClipLoadType.Streaming;
+            importer.defaultSampleSettings = currentSettings;
+            wasChanged = true;
         }
-        return false;
+
+        if (importer.forceToMono != true)
+        {
+            importer.forceToMono = true;
+            wasChanged = true;
+        }
+
+        if (currentSettings.compressionFormat != AudioCompressionFormat.Vorbis || currentSettings.quality != 0.5f)
+        {
+            currentSettings.compressionFormat = AudioCompressionFormat.Vorbis;
+            currentSettings.quality = 0.5f;
+            importer.defaultSampleSettings = currentSettings;
+            wasChanged = true;
+        }
+
+        if (wasChanged)
+            importer.SaveAndReimport();
+        return wasChanged;
     }
 
     private bool ProcessGenericAsset(string assetPath)
@@ -180,7 +156,6 @@ public class AssetProcessingService
         if (importer != null)
         {
             importer.SaveAndReimport();
-            Debug.Log($"[GenericProcessor] {assetPath} 애셋을 재임포트했습니다.");
             return true;
         }
         return false;

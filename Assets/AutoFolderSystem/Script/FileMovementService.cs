@@ -6,7 +6,7 @@ using System.Linq;
 
 public class FileMovementService
 {
-    private AssetAutomationSettings settings;
+    private readonly AssetAutomationSettings settings;
 
     public FileMovementService(AssetAutomationSettings settings)
     {
@@ -23,62 +23,39 @@ public class FileMovementService
 
         if (string.IsNullOrEmpty(settings.DestinationMoveFolder) || !AssetDatabase.IsValidFolder(settings.DestinationMoveFolder))
         {
-            if (EditorUtility.DisplayDialog("대상 폴더 없음", "대상 폴더가 존재하지 않습니다. 생성하시겠습니까?", "예", "아니오"))
+            string parentDir = Path.GetDirectoryName(settings.DestinationMoveFolder);
+            string folderName = Path.GetFileName(settings.DestinationMoveFolder);
+            if (!string.IsNullOrEmpty(parentDir) && AssetDatabase.IsValidFolder(parentDir) && EditorUtility.DisplayDialog("대상 폴더 없음", "대상 폴더가 존재하지 않습니다. 생성하시겠습니까?", "예", "아니오"))
             {
-                string parentDir = Path.GetDirectoryName(settings.DestinationMoveFolder);
-                string folderName = Path.GetFileName(settings.DestinationMoveFolder);
-                if (!string.IsNullOrEmpty(parentDir) && AssetDatabase.IsValidFolder(parentDir))
-                {
-                    AssetDatabase.CreateFolder(parentDir, folderName);
-                    AssetDatabase.Refresh();
-                    if (!AssetDatabase.IsValidFolder(settings.DestinationMoveFolder))
-                    {
-                        EditorUtility.DisplayDialog("오류", "대상 폴더를 생성할 수 없습니다.", "확인");
-                        return;
-                    }
-                }
-                else
-                {
-                    EditorUtility.DisplayDialog("오류", "유효한 대상 폴더를 선택하거나 생성할 수 없습니다. Assets 폴더 내의 경로를 확인해주세요.", "확인");
-                    return;
-                }
+                AssetDatabase.CreateFolder(parentDir, folderName);
+                AssetDatabase.Refresh();
             }
             else
             {
+                EditorUtility.DisplayDialog("오류", "유효한 대상 폴더를 선택하거나 생성할 수 없습니다.", "확인");
                 return;
             }
         }
 
-        string[] searchFilters = { "t:Object" };
         List<string> filesToMove = new List<string>();
-
-        string[] guidsInSource = AssetDatabase.FindAssets(string.Join(" ", searchFilters), new[] { settings.SourceMoveFolder });
-
+        string[] guidsInSource = AssetDatabase.FindAssets("t:Object", new[] { settings.SourceMoveFolder });
         List<string> includeKeywords = settings.FileNameContainsForMove.Split(new[] { ',', ';' }, System.StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLower()).ToList();
         List<string> excludeKeywords = settings.FileNameExcludesForMove.Split(new[] { ',', ';' }, System.StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLower()).ToList();
 
         foreach (string guid in guidsInSource)
         {
             string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+            if (AssetDatabase.IsValidFolder(assetPath))
+                continue;
+
             string fileName = Path.GetFileName(assetPath).ToLower();
-
-            if (AssetDatabase.IsValidFolder(assetPath)) continue;
-
             bool include = true;
             if (includeKeywords.Any() && !includeKeywords.Any(keyword => fileName.Contains(keyword)))
-            {
                 include = false;
-            }
-
             if (excludeKeywords.Any(keyword => fileName.Contains(keyword)))
-            {
                 include = false;
-            }
-
             if (include)
-            {
                 filesToMove.Add(assetPath);
-            }
         }
 
         if (filesToMove.Count == 0)
@@ -88,9 +65,7 @@ public class FileMovementService
         }
 
         if (!EditorUtility.DisplayDialog("파일 이동 확인", $"{filesToMove.Count}개의 파일을 '{settings.DestinationMoveFolder}'로 이동하시겠습니까?", "예", "아니오"))
-        {
             return;
-        }
 
         int movedCount = 0;
         EditorUtility.DisplayProgressBar("파일 이동 중...", "파일을 이동하고 있습니다...", 0.1f);
@@ -106,50 +81,23 @@ public class FileMovementService
                 string baseName = Path.GetFileNameWithoutExtension(fileName);
                 string subfolder = string.IsNullOrEmpty(settings.SubfolderNamePrefix) ? baseName : $"{settings.SubfolderNamePrefix}_{baseName}";
                 targetSubfolder = Path.Combine(settings.DestinationMoveFolder, subfolder).Replace('\\', '/');
-
-                if (!AssetDatabase.IsValidFolder(targetSubfolder))
-                {
-                    string parentDir = Path.GetDirectoryName(targetSubfolder);
-                    string newFolderName = Path.GetFileName(targetSubfolder);
-                    if (!string.IsNullOrEmpty(parentDir) && AssetDatabase.IsValidFolder(parentDir))
-                    {
-                        AssetDatabase.CreateFolder(parentDir, newFolderName);
-                        AssetDatabase.Refresh();
-                    }
-                    else
-                    {
-                        Debug.LogError($"[FileMover] 하위 폴더 '{targetSubfolder}'를 생성할 수 없습니다. 파일을 원래 위치에 둡니다.");
-                        continue;
-                    }
-                }
+                string parentDir = Path.GetDirectoryName(targetSubfolder);
+                string newFolderName = Path.GetFileName(targetSubfolder);
+                if (!AssetDatabase.IsValidFolder(targetSubfolder) && !string.IsNullOrEmpty(parentDir) && AssetDatabase.IsValidFolder(parentDir))
+                    AssetDatabase.CreateFolder(parentDir, newFolderName);
             }
 
             string newPath = Path.Combine(targetSubfolder, fileName).Replace('\\', '/');
-
             if (File.Exists(Application.dataPath + newPath.Substring("Assets".Length)))
-            {
-                Debug.LogWarning($"[FileMover] '{fileName}' 파일이 대상 위치에 이미 존재합니다. 이동하지 않습니다: {newPath}");
                 continue;
-            }
 
-            string result = AssetDatabase.MoveAsset(originalPath, newPath);
-
-            if (string.IsNullOrEmpty(result)) 
-            {
+            if (string.IsNullOrEmpty(AssetDatabase.MoveAsset(originalPath, newPath)))
                 movedCount++;
-                Debug.Log($"[FileMover] 파일 이동됨: '{originalPath}' -> '{newPath}'");
-            }
-            else
-            {
-                Debug.LogError($"[FileMover] 파일 이동 실패: '{originalPath}' -> '{newPath}'. 오류: {result}");
-            }
-
             EditorUtility.DisplayProgressBar("파일 이동 중...", $"이동 중: {fileName} ({i + 1}/{filesToMove.Count})", (float)i / filesToMove.Count);
         }
 
         EditorUtility.ClearProgressBar();
         AssetDatabase.Refresh();
         EditorUtility.DisplayDialog("이동 완료", $"{movedCount}개의 파일이 성공적으로 이동되었습니다.", "확인");
-        Debug.Log($"[AssetAutomation] 총 {movedCount}개의 파일이 이동되었습니다.");
     }
 }
