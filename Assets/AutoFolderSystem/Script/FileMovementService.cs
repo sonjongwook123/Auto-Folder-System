@@ -4,100 +4,185 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-public class FileMovementService
+namespace SJW
 {
-    private readonly AssetAutomationSettings settings;
-
-    public FileMovementService(AssetAutomationSettings settings)
+    public class FileMovementService
     {
-        this.settings = settings;
-    }
+        private readonly AssetAutomationSettings settings;
 
-    public void BatchMoveFiles()
-    {
-        if (string.IsNullOrEmpty(settings.SourceMoveFolder) || !AssetDatabase.IsValidFolder(settings.SourceMoveFolder))
+        public FileMovementService(AssetAutomationSettings settings)
         {
-            EditorUtility.DisplayDialog("오류", "유효한 원본 폴더를 선택해주세요.", "확인");
-            return;
+            this.settings = settings;
         }
 
-        if (string.IsNullOrEmpty(settings.DestinationMoveFolder) || !AssetDatabase.IsValidFolder(settings.DestinationMoveFolder))
+        public void BatchMoveFiles()
         {
-            string parentDir = Path.GetDirectoryName(settings.DestinationMoveFolder);
-            string folderName = Path.GetFileName(settings.DestinationMoveFolder);
-            if (!string.IsNullOrEmpty(parentDir) && AssetDatabase.IsValidFolder(parentDir) && EditorUtility.DisplayDialog("대상 폴더 없음", "대상 폴더가 존재하지 않습니다. 생성하시겠습니까?", "예", "아니오"))
+            if (string.IsNullOrEmpty(settings.SourceMoveFolder) || string.IsNullOrEmpty(settings.DestinationMoveFolder))
             {
-                AssetDatabase.CreateFolder(parentDir, folderName);
-                AssetDatabase.Refresh();
-            }
-            else
-            {
-                EditorUtility.DisplayDialog("오류", "유효한 대상 폴더를 선택하거나 생성할 수 없습니다.", "확인");
+                EditorUtility.DisplayDialog("오류", "원본 폴더와 대상 폴더를 모두 지정해야 합니다.", "확인");
                 return;
             }
-        }
 
-        List<string> filesToMove = new List<string>();
-        string[] guidsInSource = AssetDatabase.FindAssets("t:Object", new[] { settings.SourceMoveFolder });
-        List<string> includeKeywords = settings.FileNameContainsForMove.Split(new[] { ',', ';' }, System.StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLower()).ToList();
-        List<string> excludeKeywords = settings.FileNameExcludesForMove.Split(new[] { ',', ';' }, System.StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLower()).ToList();
-
-        foreach (string guid in guidsInSource)
-        {
-            string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-            if (AssetDatabase.IsValidFolder(assetPath))
-                continue;
-
-            string fileName = Path.GetFileName(assetPath).ToLower();
-            bool include = true;
-            if (includeKeywords.Any() && !includeKeywords.Any(keyword => fileName.Contains(keyword)))
-                include = false;
-            if (excludeKeywords.Any(keyword => fileName.Contains(keyword)))
-                include = false;
-            if (include)
-                filesToMove.Add(assetPath);
-        }
-
-        if (filesToMove.Count == 0)
-        {
-            EditorUtility.DisplayDialog("정보", "이동할 파일을 찾을 수 없습니다.", "확인");
-            return;
-        }
-
-        if (!EditorUtility.DisplayDialog("파일 이동 확인", $"{filesToMove.Count}개의 파일을 '{settings.DestinationMoveFolder}'로 이동하시겠습니까?", "예", "아니오"))
-            return;
-
-        int movedCount = 0;
-        EditorUtility.DisplayProgressBar("파일 이동 중...", "파일을 이동하고 있습니다...", 0.1f);
-
-        for (int i = 0; i < filesToMove.Count; i++)
-        {
-            string originalPath = filesToMove[i];
-            string fileName = Path.GetFileName(originalPath);
-            string targetSubfolder = settings.DestinationMoveFolder;
-
-            if (settings.CreateSubfolder)
+            if (!AssetDatabase.IsValidFolder(settings.SourceMoveFolder) || !AssetDatabase.IsValidFolder(settings.DestinationMoveFolder))
             {
-                string baseName = Path.GetFileNameWithoutExtension(fileName);
-                string subfolder = string.IsNullOrEmpty(settings.SubfolderNamePrefix) ? baseName : $"{settings.SubfolderNamePrefix}_{baseName}";
-                targetSubfolder = Path.Combine(settings.DestinationMoveFolder, subfolder).Replace('\\', '/');
-                string parentDir = Path.GetDirectoryName(targetSubfolder);
-                string newFolderName = Path.GetFileName(targetSubfolder);
-                if (!AssetDatabase.IsValidFolder(targetSubfolder) && !string.IsNullOrEmpty(parentDir) && AssetDatabase.IsValidFolder(parentDir))
-                    AssetDatabase.CreateFolder(parentDir, newFolderName);
+                EditorUtility.DisplayDialog("오류", "유효하지 않은 폴더 경로입니다.", "확인");
+                return;
             }
 
-            string newPath = Path.Combine(targetSubfolder, fileName).Replace('\\', '/');
-            if (File.Exists(Application.dataPath + newPath.Substring("Assets".Length)))
-                continue;
+            string[] includeFilters = string.IsNullOrEmpty(settings.FileNameContainsForMove)
+                ? new string[0]
+                : settings.FileNameContainsForMove.Split(',').Select(f => f.Trim().ToLower()).ToArray();
+            string[] excludeFilters = string.IsNullOrEmpty(settings.FileNameExcludesForMove)
+                ? new string[0]
+                : settings.FileNameExcludesForMove.Split(',').Select(f => f.Trim().ToLower()).ToArray();
 
-            if (string.IsNullOrEmpty(AssetDatabase.MoveAsset(originalPath, newPath)))
-                movedCount++;
-            EditorUtility.DisplayProgressBar("파일 이동 중...", $"이동 중: {fileName} ({i + 1}/{filesToMove.Count})", (float)i / filesToMove.Count);
+            string[] guids = AssetDatabase.FindAssets("", new[] { settings.SourceMoveFolder });
+            string destinationFolder = settings.DestinationMoveFolder;
+            if (settings.CreateSubfolder && !string.IsNullOrEmpty(settings.SubfolderNamePrefix))
+            {
+                destinationFolder = Path.Combine(destinationFolder, settings.SubfolderNamePrefix).Replace('\\', '/');
+                if (!AssetDatabase.IsValidFolder(destinationFolder))
+                    AssetDatabase.CreateFolder(settings.DestinationMoveFolder, settings.SubfolderNamePrefix);
+            }
+
+            foreach (string guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                string fileName = Path.GetFileNameWithoutExtension(assetPath).ToLower();
+                bool matchesInclude = includeFilters.Length == 0 || includeFilters.Any(f => fileName.Contains(f));
+                bool matchesExclude = excludeFilters.Any(f => fileName.Contains(f));
+
+                if (matchesInclude && !matchesExclude && !string.IsNullOrEmpty(assetPath) && File.Exists(assetPath))
+                {
+                    string newPath = Path.Combine(destinationFolder, Path.GetFileName(assetPath)).Replace('\\', '/');
+                    if (newPath != assetPath)
+                    {
+                        string error = AssetDatabase.MoveAsset(assetPath, newPath);
+                        if (!string.IsNullOrEmpty(error))
+                            Debug.LogError($"Failed to move {assetPath} to {newPath}: {error}");
+                    }
+                }
+            }
+
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("완료", "파일 이동 작업이 완료되었습니다.", "확인");
         }
 
-        EditorUtility.ClearProgressBar();
-        AssetDatabase.Refresh();
-        EditorUtility.DisplayDialog("이동 완료", $"{movedCount}개의 파일이 성공적으로 이동되었습니다.", "확인");
+        public void BatchRenameFiles()
+        {
+            if (string.IsNullOrEmpty(settings.RenameSourceFolder))
+            {
+                EditorUtility.DisplayDialog("오류", "원본 폴더를 지정해야 합니다.", "확인");
+                return;
+            }
+
+            if (!AssetDatabase.IsValidFolder(settings.RenameSourceFolder))
+            {
+                EditorUtility.DisplayDialog("오류", "유효하지 않은 원본 폴더 경로입니다.", "확인");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(settings.RenameOldString) || string.IsNullOrEmpty(settings.RenameNewString))
+            {
+                EditorUtility.DisplayDialog("오류", "변경 전 문자열과 변경 후 문자열을 모두 입력해야 합니다.", "확인");
+                return;
+            }
+
+            string[] includeFilters = string.IsNullOrEmpty(settings.RenameFileNameContains)
+                ? new string[0]
+                : settings.RenameFileNameContains.Split(',').Select(f => f.Trim().ToLower()).ToArray();
+            string[] excludeFilters = string.IsNullOrEmpty(settings.RenameFileNameExcludes)
+                ? new string[0]
+                : settings.RenameFileNameExcludes.Split(',').Select(f => f.Trim().ToLower()).ToArray();
+
+            string[] guids = AssetDatabase.FindAssets("", new[] { settings.RenameSourceFolder });
+            int renameCount = 0;
+
+            foreach (string guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (settings.ExcludedFolders.Any(excluded => assetPath.StartsWith(excluded + "/")))
+                    continue;
+
+                string fileName = Path.GetFileNameWithoutExtension(assetPath).ToLower();
+                bool matchesInclude = includeFilters.Length == 0 || includeFilters.Any(f => fileName.Contains(f));
+                bool matchesExclude = excludeFilters.Any(f => fileName.Contains(f));
+
+                if (matchesInclude && !matchesExclude && !string.IsNullOrEmpty(assetPath) && File.Exists(assetPath))
+                {
+                    string newFileName = Path.GetFileNameWithoutExtension(assetPath).Replace(settings.RenameOldString, settings.RenameNewString);
+                    string extension = Path.GetExtension(assetPath);
+                    string parentFolder = Path.GetDirectoryName(assetPath);
+                    string newPath = Path.Combine(parentFolder, newFileName + extension).Replace('\\', '/');
+
+                    if (newPath != assetPath && !AssetDatabase.IsValidFolder(newPath) && !File.Exists(newPath))
+                    {
+                        string error = AssetDatabase.RenameAsset(assetPath, newFileName);
+                        if (string.IsNullOrEmpty(error))
+                            renameCount++;
+                        else
+                            Debug.LogError($"Failed to rename {assetPath} to {newPath}: {error}");
+                    }
+                    else if (newPath != assetPath)
+                    {
+                        Debug.LogWarning($"Skipped renaming {assetPath} to {newPath}: Target path already exists.");
+                    }
+                }
+            }
+
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("완료", $"파일 이름 변경 작업이 완료되었습니다. {renameCount}개의 파일이 변경되었습니다.", "확인");
+        }
+
+        public void BatchAddPrefixSuffix()
+        {
+            if (string.IsNullOrEmpty(settings.RenamePrefix) && string.IsNullOrEmpty(settings.RenameSuffix))
+            {
+                EditorUtility.DisplayDialog("오류", "접두사 또는 접미사를 입력해야 합니다.", "확인");
+                return;
+            }
+
+            if (settings.SelectedFiles.Count == 0)
+            {
+                EditorUtility.DisplayDialog("오류", "변경할 파일을 선택해야 합니다.", "확인");
+                return;
+            }
+
+            int renameCount = 0;
+            foreach (string assetPath in settings.SelectedFiles.ToList())
+            {
+                if (!File.Exists(assetPath))
+                    continue;
+
+                string fileName = Path.GetFileNameWithoutExtension(assetPath);
+                string extension = Path.GetExtension(assetPath);
+                string parentFolder = Path.GetDirectoryName(assetPath);
+                string newFileName = (settings.RenamePrefix ?? "") + fileName + (settings.RenameSuffix ?? "");
+                string newPath = Path.Combine(parentFolder, newFileName + extension).Replace('\\', '/');
+
+                if (newPath != assetPath && !AssetDatabase.IsValidFolder(newPath) && !File.Exists(newPath))
+                {
+                    string error = AssetDatabase.RenameAsset(assetPath, newFileName);
+                    if (string.IsNullOrEmpty(error))
+                    {
+                        renameCount++;
+                        settings.SelectedFiles.Remove(assetPath);
+                        settings.SelectedFiles.Add(newPath);
+                    }
+                    else
+                    {
+                        Debug.LogError($"Failed to rename {assetPath} to {newPath}: {error}");
+                    }
+                }
+                else if (newPath != assetPath)
+                {
+                    Debug.LogWarning($"Skipped renaming {assetPath} to {newPath}: Target path already exists.");
+                }
+            }
+
+            settings.SaveSettings();
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("완료", $"파일 이름 변경 작업이 완료되었습니다. {renameCount}개의 파일이 변경되었습니다.", "확인");
+        }
     }
 }

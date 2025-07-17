@@ -1,147 +1,146 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 
-public class AssetAutomationSettings : ScriptableObject
+namespace SJW
 {
-    private static AssetAutomationSettings instance;
-    public static AssetAutomationSettings Instance
+    public class AssetAutomationSettings : ScriptableObject
     {
-        get
+        private static AssetAutomationSettings instance;
+
+        public static AssetAutomationSettings Instance
         {
-            if (instance == null)
+            get
             {
-                instance = AssetDatabase.LoadAssetAtPath<AssetAutomationSettings>(SETTINGS_PATH);
                 if (instance == null)
                 {
-                    string directoryPath = Path.GetDirectoryName(SETTINGS_PATH).Replace('\\', '/');
-                    if (!AssetDatabase.IsValidFolder(directoryPath))
+                    instance = AssetDatabase.LoadAssetAtPath<AssetAutomationSettings>("Assets/AutoFolderSystem/AssetAutomationSettings.asset");
+                    if (instance == null)
                     {
-                        string currentPath = "Assets";
-                        string[] folders = directoryPath.Split('/');
-                        for (int i = 1; i < folders.Length; i++)
-                        {
-                            string nextPath = Path.Combine(currentPath, folders[i]).Replace('\\', '/');
-                            if (!AssetDatabase.IsValidFolder(nextPath))
-                                AssetDatabase.CreateFolder(currentPath, folders[i]);
-                            currentPath = nextPath;
-                        }
+                        instance = CreateInstance<AssetAutomationSettings>();
+                        AssetDatabase.CreateAsset(instance, "Assets/AutoFolderSystem/AssetAutomationSettings.asset");
+                        AssetDatabase.SaveAssets();
                     }
-                    instance = CreateInstance<AssetAutomationSettings>();
-                    AssetDatabase.CreateAsset(instance, SETTINGS_PATH);
-                    AssetDatabase.SaveAssets();
                 }
+                return instance;
             }
-            return instance;
         }
-    }
 
-    public string SelectedExtension = ".png";
-    public List<string> TargetFolders = new List<string>();
-    public List<string> CustomExtensions = new List<string>();
-    public List<string> ExcludedFolders = new List<string> { "Assets/AutoFolderSystem", "Assets/Editor" };
-    public string SourceMoveFolder = "Assets/";
-    public string DestinationMoveFolder = "Assets/";
-    public string FileNameContainsForMove = "";
-    public string FileNameExcludesForMove = "";
-    public bool CreateSubfolder = false;
-    public string SubfolderNamePrefix = "";
-    public string DeleteTargetFolder = "Assets/";
-    public string FileNameContainsForDelete = "";
-    public string FileNameExcludesForDelete = "";
-    public bool IncludeSubfoldersForDelete = true;
+        [SerializeField] private List<string> targetFolders = new List<string>();
+        [SerializeField] private string selectedExtension = ".png";
+        [SerializeField] private List<string> customExtensions = new List<string>();
+        [SerializeField] private List<string> excludedFolders = new List<string> { "Assets/AutoFolderSystem" };
+        [SerializeField] private string sourceMoveFolder = "Assets";
+        [SerializeField] private string destinationMoveFolder = "Assets";
+        [SerializeField] private string fileNameContainsForMove = "";
+        [SerializeField] private string fileNameExcludesForMove = "";
+        [SerializeField] private bool createSubfolder = false;
+        [SerializeField] private string subfolderNamePrefix = "";
+        [SerializeField] private string deleteTargetFolder = "Assets";
+        [SerializeField] private bool includeSubfoldersForDelete = false;
+        [SerializeField] private string fileNameContainsForDelete = "";
+        [SerializeField] private string fileNameExcludesForDelete = "";
+        [SerializeField] private string renameSourceFolder = "Assets";
+        [SerializeField] private string renameOldString = "";
+        [SerializeField] private string renameNewString = "";
+        [SerializeField] private string renameFileNameContains = "";
+        [SerializeField] private string renameFileNameExcludes = "";
+        [SerializeField] private string renamePrefix = "";
+        [SerializeField] private string renameSuffix = "";
+        [SerializeField] private List<string> selectedFiles = new List<string>();
 
-    private const string SETTINGS_PATH = "Assets/Editor/AssetAutomation/AssetAutomationSettings.asset";
+        public List<string> TargetFolders { get => targetFolders; set => targetFolders = value; }
+        public string SelectedExtension { get => selectedExtension; set => selectedExtension = value; }
+        public List<string> CustomExtensions { get => customExtensions; set => customExtensions = value; }
+        public List<string> ExcludedFolders { get => excludedFolders; set => excludedFolders = value; }
+        public string SourceMoveFolder { get => sourceMoveFolder; set => sourceMoveFolder = value; }
+        public string DestinationMoveFolder { get => destinationMoveFolder; set => destinationMoveFolder = value; }
+        public string FileNameContainsForMove { get => fileNameContainsForMove; set => fileNameContainsForMove = value; }
+        public string FileNameExcludesForMove { get => fileNameExcludesForMove; set => fileNameExcludesForMove = value; }
+        public bool CreateSubfolder { get => createSubfolder; set => createSubfolder = value; }
+        public string SubfolderNamePrefix { get => subfolderNamePrefix; set => subfolderNamePrefix = value; }
+        public string DeleteTargetFolder { get => deleteTargetFolder; set => deleteTargetFolder = value; }
+        public bool IncludeSubfoldersForDelete { get => includeSubfoldersForDelete; set => includeSubfoldersForDelete = value; }
+        public string FileNameContainsForDelete { get => fileNameContainsForDelete; set => fileNameContainsForDelete = value; }
+        public string FileNameExcludesForDelete { get => fileNameExcludesForDelete; set => fileNameExcludesForDelete = value; }
+        public string RenameSourceFolder { get => renameSourceFolder; set => renameSourceFolder = value; }
+        public string RenameOldString { get => renameOldString; set => renameOldString = value; }
+        public string RenameNewString { get => renameNewString; set => renameNewString = value; }
+        public string RenameFileNameContains { get => renameFileNameContains; set => renameFileNameContains = value; }
+        public string RenameFileNameExcludes { get => renameFileNameExcludes; set => renameFileNameExcludes = value; }
+        public string RenamePrefix { get => renamePrefix; set => renamePrefix = value; }
+        public string RenameSuffix { get => renameSuffix; set => renameSuffix = value; }
+        public List<string> SelectedFiles { get => selectedFiles; set => selectedFiles = value; }
 
-    public void SaveSettings()
-    {
-        EditorUtility.SetDirty(this);
-        AssetDatabase.SaveAssets();
-    }
-
-    public void AddCustomExtension(string extension)
-    {
-        if (string.IsNullOrEmpty(extension))
+        public void AddCustomExtension(string extension)
         {
-            EditorUtility.DisplayDialog("확장자 오류", "확장자를 입력해주세요.", "확인");
-            return;
+            if (!string.IsNullOrEmpty(extension) && !customExtensions.Contains(extension))
+            {
+                customExtensions.Add(extension);
+                SaveSettings();
+            }
         }
 
-        if (!extension.StartsWith("."))
-            extension = "." + extension;
-
-        extension = extension.ToLower();
-        if (CustomExtensions.Contains(extension) || new[] { ".png", ".jpg", ".fbx", ".wav", ".mp3", ".ogg" }.Contains(extension))
+        public void RemoveCustomExtension(string extension)
         {
-            EditorUtility.DisplayDialog("확장자 오류", $"확장자 '{extension}'는 이미 존재하거나 기본 확장자입니다.", "확인");
-            return;
+            if (customExtensions.Contains(extension))
+            {
+                customExtensions.Remove(extension);
+                SaveSettings();
+            }
         }
 
-        CustomExtensions.Add(extension);
-        SaveSettings();
-    }
-
-    public void RemoveCustomExtension(string extension)
-    {
-        if (CustomExtensions.Remove(extension) && SelectedExtension == extension)
-            SelectedExtension = ".png";
-        SaveSettings();
-    }
-
-    public void AddExcludedFolder(string path)
-    {
-        if (string.IsNullOrEmpty(path))
+        public void AddExcludedFolder(string folderPath)
         {
-            EditorUtility.DisplayDialog("경로 오류", "폴더 경로를 입력해주세요.", "확인");
-            return;
+            if (!string.IsNullOrEmpty(folderPath) && !excludedFolders.Contains(folderPath))
+            {
+                excludedFolders.Add(folderPath);
+                SaveSettings();
+            }
         }
 
-        if (!path.StartsWith("Assets/"))
-            path = Path.Combine("Assets", path.TrimStart('/')).Replace('\\', '/');
-        path = path.TrimEnd('/');
-
-        if (ExcludedFolders.Contains(path))
+        public void RemoveExcludedFolder(string folderPath)
         {
-            EditorUtility.DisplayDialog("경로 오류", $"폴더 '{path}'는 이미 제외 목록에 있습니다.", "확인");
-            return;
+            if (excludedFolders.Contains(folderPath))
+            {
+                excludedFolders.Remove(folderPath);
+                SaveSettings();
+            }
         }
 
-        if (!AssetDatabase.IsValidFolder(path))
+        public void ClearAllSettings()
         {
-            EditorUtility.DisplayDialog("경로 오류", $"폴더 '{path}'는 유효한 Assets 내 폴더가 아닙니다.", "확인");
-            return;
-        }
-
-        ExcludedFolders.Add(path);
-        SaveSettings();
-    }
-
-    public void RemoveExcludedFolder(string path)
-    {
-        if (ExcludedFolders.Remove(path))
+            targetFolders.Clear();
+            selectedExtension = ".png";
+            customExtensions.Clear();
+            excludedFolders.Clear();
+            excludedFolders.Add("Assets/Editor");
+            excludedFolders.Add("Assets/AutoFolderSystem");
+            sourceMoveFolder = "Assets";
+            destinationMoveFolder = "Assets";
+            fileNameContainsForMove = "";
+            fileNameExcludesForMove = "";
+            createSubfolder = false;
+            subfolderNamePrefix = "";
+            deleteTargetFolder = "Assets";
+            includeSubfoldersForDelete = false;
+            fileNameContainsForDelete = "";
+            fileNameExcludesForDelete = "";
+            renameSourceFolder = "Assets";
+            renameOldString = "";
+            renameNewString = "";
+            renameFileNameContains = "";
+            renameFileNameExcludes = "";
+            renamePrefix = "";
+            renameSuffix = "";
+            selectedFiles.Clear();
             SaveSettings();
-    }
+        }
 
-    public void ClearAllSettings()
-    {
-        SelectedExtension = ".png";
-        TargetFolders.Clear();
-        CustomExtensions.Clear();
-        ExcludedFolders.Clear();
-        ExcludedFolders.Add("Assets/AutoFolderSystem");
-        ExcludedFolders.Add("Assets/Editor");
-        SourceMoveFolder = "Assets/";
-        DestinationMoveFolder = "Assets/MovedAssets/";
-        FileNameContainsForMove = "";
-        FileNameExcludesForMove = "";
-        CreateSubfolder = true;
-        SubfolderNamePrefix = "";
-        DeleteTargetFolder = "Assets/";
-        FileNameContainsForDelete = "";
-        FileNameExcludesForDelete = "";
-        IncludeSubfoldersForDelete = true;
-        SaveSettings();
+        public void SaveSettings()
+        {
+            EditorUtility.SetDirty(this);
+            AssetDatabase.SaveAssets();
+        }
     }
 }
