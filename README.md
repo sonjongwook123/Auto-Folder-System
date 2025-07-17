@@ -24,19 +24,6 @@
 
 ---
 
-## 설치
-
-이 도구는 사용자 정의 에디터 도구이므로, 제공된 C# 스크립트를 Unity 프로젝트의 `Assets/Editor/` 폴더에 직접 배치하여 설치합니다.
-
-1.  **`Editor` 폴더 생성:** Unity 프로젝트의 `Assets` 창에서 `Editor` 폴더가 아직 없다면 새로 생성합니다 (`Assets/Editor/`).
-2.  **`AssetAutomation` 하위 폴더 생성:** `Assets/Editor/` 폴더 안에 `AssetAutomation`이라는 새 폴더를 생성합니다 (`Assets/Editor/AssetAutomation/`).
-3.  **스크립트 파일 배치:** 제공된 모든 C# 스크립트 파일(`.cs` 파일: `AssetAutomationWindow.cs`, `AssetAutomationSettings.cs`, `AssetProcessingService.cs`, `FileDeletionService.cs`, `FileMovementService.cs`, `FolderManagementService.cs`, `StringListWrapper.cs`)을 `Assets/Editor/AssetAutomation/` 폴더에 복사하여 붙여넣습니다.
-    * **중요:** `AssetAutomationSettings.cs` 파일이 반드시 `Assets/Editor/AssetAutomation/AssetAutomationSettings.cs` 경로에 위치해야 합니다. 이는 도구가 설정 애셋을 올바르게 생성하고 로드하는 데 필수적입니다.
-4.  **선택 사항: 배너 이미지 추가:** 도구 창 상단에 시각적 배너를 표시하려면 `500x100` 픽셀 크기의 PNG 이미지 파일(`banner_500x100.png`)을 `Assets/Editor Default Resources/` 폴더에 배치합니다 (폴더가 없다면 생성).
-5.  **Unity 재컴파일:** Unity는 새 에디터 스크립트를 자동으로 감지하고 컴파일합니다. 컴파일이 완료될 때까지 기다립니다.
-
----
-
 ## 사용법 / 시작하기
 
 1.  **도구 창 열기:** Unity 에디터에서 상단 메뉴의 `Tools > Asset Automation Tool`을 선택하여 도구 창을 엽니다.
