@@ -24,11 +24,6 @@
 
 ---
 
-## 설치
-**`AssetAutomation` 하위 폴더 생성:** `Assets/` 폴더 안에 `AssetAutomation`이라는 새 폴더를 생성합니다 (`Assets/Editor/AssetAutomation/`).
-    * **중요:** `AssetAutomationSettings.cs` 파일이 반드시 `Assets/AssetAutomation/AssetAutomationSettings.cs` 경로에 위치해야 합니다. 이는 도구가 설정 애셋을 올바르게 생성하고 로드하는 데 필수적입니다.
----
-
 ## 사용법 / 시작하기
 
 1.  **도구 창 열기:** Unity 에디터에서 상단 메뉴의 `Tools > Asset Automation Tool`을 선택하여 도구 창을 엽니다.
